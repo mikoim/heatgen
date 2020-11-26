@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::process;
-use std::sync::RwLock;
 
+use clap::{App, Arg};
 use image::{GrayImage, Luma};
 use ndarray::Array2;
 use rayon::prelude::*;
@@ -14,15 +13,21 @@ struct Point {
     y: u32,
 }
 
-fn example(width: u32, height: u32) -> Result<(), Box<dyn Error>> {
+fn process(
+    width: u32,
+    height: u32,
+    radius: u32,
+    input: &str,
+    output: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut img = GrayImage::new(width, height);
-    let freq = RwLock::new(Array2::<u32>::zeros((height as usize, width as usize)));
+    let mut freq = Array2::<u32>::zeros((height as usize, width as usize));
 
     let mut points = HashMap::<Point, u32>::new();
 
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
-        .from_path("input.csv")?;
+        .from_path(input)?;
     let mut raw_record = csv::StringRecord::new();
 
     while reader.read_record(&mut raw_record)? {
@@ -31,10 +36,10 @@ fn example(width: u32, height: u32) -> Result<(), Box<dyn Error>> {
         *count += 1;
     }
 
-    let max = RwLock::new(0);
+    let mut max: u32 = 0;
 
-    points.par_iter().for_each(|a| {
-        let r = 50;
+    points.iter().for_each(|a| {
+        let r = radius as i32;
         let cx = a.0.x as i32;
         let cy = a.0.y as i32;
         for y in -r..r {
@@ -43,11 +48,10 @@ fn example(width: u32, height: u32) -> Result<(), Box<dyn Error>> {
                     let xx = cx + x;
                     let yy = cy + y;
                     if 0 < xx && xx < width as i32 && 0 < yy && yy < height as i32 {
-                        let mut aa = freq.write().unwrap();
-                        let v = aa.get_mut((yy as usize, xx as usize)).unwrap();
+                        let v = freq.get_mut((yy as usize, xx as usize)).unwrap();
                         *v += a.1;
-                        if *max.read().unwrap() < *v {
-                            *max.write().unwrap() = *v;
+                        if max < *v {
+                            max = *v;
                         }
                     }
                 }
@@ -56,24 +60,61 @@ fn example(width: u32, height: u32) -> Result<(), Box<dyn Error>> {
     });
 
     img.enumerate_rows_mut().par_bridge().for_each(|(y, line)| {
-        let foo = freq.read().unwrap();
-        let aa = foo.row(y as usize);
-        let bb = line;
-
-        aa.iter().zip(bb.into_iter()).for_each(|(a, b)| {
-            let (_, _, p) = b;
-            *p = Luma([(255.0 * *a as f32 / *max.read().unwrap() as f32) as u8]);
-        });
+        freq.row(y as usize)
+            .iter()
+            .zip(line.into_iter())
+            .for_each(|(a, b)| {
+                let (_, _, p) = b;
+                *p = Luma([(255.0 * *a as f32 / max as f32) as u8]);
+            });
     });
 
-    img.save("output.png");
+    img.save(output);
 
     Ok(())
 }
 
 fn main() {
-    if let Err(err) = example(1920, 1080) {
-        println!("error running example: {}", err);
-        process::exit(1);
-    }
+    let matches = App::new("Heatmap generator")
+        .version("0.0.1")
+        .author("Eshin Kunishima <ek@esh.ink>")
+        .arg(
+            Arg::new("WIDTH")
+                .about("Image width")
+                .default_value("1920")
+                .short('w'),
+        )
+        .arg(
+            Arg::new("HEIGHT")
+                .about("Image height")
+                .default_value("1080")
+                .short('h'),
+        )
+        .arg(
+            Arg::new("RADIUS")
+                .about("Radius")
+                .default_value("100")
+                .short('r'),
+        )
+        .arg(
+            Arg::new("INPUT")
+                .about("Input csv file path (e.g., input.csv)")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::new("OUTPUT")
+                .about("Output heatmap image path (e.g., output.png)")
+                .required(true)
+                .index(2),
+        )
+        .get_matches();
+
+    let width: u32 = matches.value_of_t("WIDTH").unwrap();
+    let height: u32 = matches.value_of_t("HEIGHT").unwrap();
+    let radius: u32 = matches.value_of_t("RADIUS").unwrap();
+    let input = matches.value_of("INPUT").unwrap();
+    let output = matches.value_of("OUTPUT").unwrap();
+
+    process(width, height, radius, input, output);
 }

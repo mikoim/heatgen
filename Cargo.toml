@@ -7,6 +7,7 @@ repository = "https://github.com/mikoim/heatgen/"
 license = "MIT"
 
 [dependencies]
+clap = "3.0.0-beta.2"
 csv = "1.1.4"
 image = "0.23.12"
 ndarray = { version = "0.13.1", features = ["serde", "rayon"] }
