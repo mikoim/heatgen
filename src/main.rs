@@ -31,9 +31,10 @@ fn process(
     let mut raw_record = csv::StringRecord::new();
 
     while reader.read_record(&mut raw_record)? {
-        let record: Point = raw_record.deserialize(None)?;
-        let count = points.entry(record).or_insert(0);
-        *count += 1;
+        raw_record.deserialize(None).map(|record|{
+            let count = points.entry(record).or_insert(0);
+            *count += 1;
+        }).unwrap_or_else(|err|{eprintln!("Skipping unrecognized line: {}", err)});
     }
 
     let mut max: u32 = 0;
@@ -69,7 +70,7 @@ fn process(
             });
     });
 
-    img.save(output);
+    img.save(output)?;
 
     Ok(())
 }
@@ -116,5 +117,8 @@ fn main() {
     let input = matches.value_of("INPUT").unwrap();
     let output = matches.value_of("OUTPUT").unwrap();
 
-    process(width, height, radius, input, output);
+    match process(width, height, radius, input, output) {
+        Ok(_) => println!(""),
+        Err(err) => eprintln!("Error! {}", err),
+    }
 }
