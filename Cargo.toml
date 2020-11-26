@@ -1,6 +1,6 @@
 [package]
 name = "heatgen"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["Eshin Kunishima <ek@esh.ink>"]
 edition = "2018"
 repository = "https://github.com/mikoim/heatgen/"

@@ -77,7 +77,7 @@ fn process(
 
 fn main() {
     let matches = App::new("Heatmap generator")
-        .version("0.0.1")
+        .version("0.0.0")
         .author("Eshin Kunishima <ek@esh.ink>")
         .arg(
             Arg::new("WIDTH")
